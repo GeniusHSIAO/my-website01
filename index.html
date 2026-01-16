@@ -1,226 +1,166 @@
-import React, { useState, useMemo } from 'react';
-import { Trophy, Users, RotateCcw, Info, Undo2, AlertTriangle, Check, X } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動賓果遊戲 v3 - 出題者視角</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
 
-const App = () => {
-  // 遊戲狀態：25 個格子的佔領情況
-  const [grid, setGrid] = useState(Array(25).fill([]));
-  // 紀錄歷史紀錄，用於返回上一步
-  const [history, setHistory] = useState([]);
-  // 當前選擇的隊伍
-  const [activeTeam, setActiveTeam] = useState('red');
-  // 控制自定義重置確認視窗
-  const [showResetModal, setShowResetModal] = useState(false);
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
 
-  // 定義隊伍資訊 (優化：將 Tailwind 類名寫死，防止編譯時被過濾)
-  const TEAMS = {
-    red: { 
-      id: 'red', 
-      name: '紅組', 
-      color: '#ef4444', 
-      bgColor: 'bg-red-500', 
-      activeClass: 'border-red-400 bg-red-50' 
-    },
-    blue: { 
-      id: 'blue', 
-      name: '藍組', 
-      color: '#3b82f6', 
-      bgColor: 'bg-blue-500', 
-      activeClass: 'border-blue-400 bg-blue-50' 
-    },
-    yellow: { 
-      id: 'yellow', 
-      name: '黃組', 
-      color: '#eab308', 
-      bgColor: 'bg-yellow-500', 
-      activeClass: 'border-yellow-400 bg-yellow-50' 
-    }
-  };
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+        const { Trophy, Users, RotateCcw, Info, Undo2, AlertTriangle, Check, X } = lucideReact;
 
-  // 定義賓果連線路徑
-  const BINGO_LINES = useMemo(() => {
-    const lines = [];
-    for (let i = 0; i < 5; i++) lines.push([i * 5, i * 5 + 1, i * 5 + 2, i * 5 + 3, i * 5 + 4]); // 橫
-    for (let i = 0; i < 5; i++) lines.push([i, i + 5, i + 10, i + 15, i + 20]); // 直
-    lines.push([0, 6, 12, 18, 24]); // 斜
-    lines.push([4, 8, 12, 16, 20]); // 斜
-    return lines;
-  }, []);
+        const App = () => {
+            const [grid, setGrid] = useState(Array(25).fill([]));
+            const [history, setHistory] = useState([]);
+            const [activeTeam, setActiveTeam] = useState('red');
+            const [showResetModal, setShowResetModal] = useState(false);
 
-  // 計算分數
-  const scores = useMemo(() => {
-    const results = { red: 0, blue: 0, yellow: 0 };
-    Object.keys(TEAMS).forEach(teamId => {
-      let cellPoints = grid.filter(cell => cell.includes(teamId)).length;
-      let bingoPoints = 0;
-      BINGO_LINES.forEach(line => {
-        if (line.every(index => grid[index].includes(teamId))) bingoPoints += 3;
-      });
-      results[teamId] = cellPoints + bingoPoints;
-    });
-    return results;
-  }, [grid]);
+            const TEAMS = {
+                red: { id: 'red', name: '紅組', color: '#ef4444', bgColor: 'bg-red-500', activeClass: 'border-red-400 bg-red-50' },
+                blue: { id: 'blue', name: '藍組', color: '#3b82f6', bgColor: 'bg-blue-500', activeClass: 'border-blue-400 bg-blue-50' },
+                yellow: { id: 'yellow', name: '黃組', color: '#eab308', bgColor: 'bg-yellow-500', activeClass: 'border-yellow-400 bg-yellow-50' }
+            };
 
-  // 處理格子點擊
-  const handleCellClick = (index) => {
-    if (!activeTeam) return;
-    setHistory(prev => [...prev, [...grid]].slice(-50)); // 深拷貝當前狀態
-    setGrid(prevGrid => {
-      const newGrid = [...prevGrid];
-      const currentCell = [...newGrid[index]];
-      if (currentCell.includes(activeTeam)) {
-        newGrid[index] = currentCell.filter(t => t !== activeTeam);
-      } else if (currentCell.length < 2) {
-        newGrid[index] = [...currentCell, activeTeam];
-      }
-      return newGrid;
-    });
-  };
+            const BINGO_LINES = useMemo(() => {
+                const lines = [];
+                for (let i = 0; i < 5; i++) lines.push([i * 5, i * 5 + 1, i * 5 + 2, i * 5 + 3, i * 5 + 4]);
+                for (let i = 0; i < 5; i++) lines.push([i, i + 5, i + 10, i + 15, i + 20]);
+                lines.push([0, 6, 12, 18, 24], [4, 8, 12, 16, 20]);
+                return lines;
+            }, []);
 
-  // 返回上一步
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    const previousState = history[history.length - 1];
-    setGrid(previousState);
-    setHistory(prev => prev.slice(0, -1));
-  };
+            const scores = useMemo(() => {
+                const results = { red: 0, blue: 0, yellow: 0 };
+                Object.keys(TEAMS).forEach(teamId => {
+                    let cellPoints = grid.filter(cell => cell.includes(teamId)).length;
+                    let bingoPoints = 0;
+                    BINGO_LINES.forEach(line => {
+                        if (line.every(index => grid[index].includes(teamId))) bingoPoints += 3;
+                    });
+                    results[teamId] = cellPoints + bingoPoints;
+                });
+                return results;
+            }, [grid]);
 
-  // 執行重置動作
-  const confirmReset = () => {
-    setGrid(Array(25).fill([]));
-    setHistory([]);
-    setActiveTeam('red');
-    setShowResetModal(false);
-  };
+            const handleCellClick = (index) => {
+                setHistory(prev => [...prev, JSON.parse(JSON.stringify(grid))].slice(-50));
+                setGrid(prevGrid => {
+                    const newGrid = [...prevGrid];
+                    const currentCell = [...newGrid[index]];
+                    if (currentCell.includes(activeTeam)) {
+                        newGrid[index] = currentCell.filter(t => t !== activeTeam);
+                    } else if (currentCell.length < 2) {
+                        newGrid[index] = [...currentCell, activeTeam];
+                    }
+                    return newGrid;
+                });
+            };
 
-  // 渲染格子樣式
-  const getCellStyles = (cellTeams) => {
-    if (cellTeams.length === 0) return { backgroundColor: '#f8fafc' };
-    if (cellTeams.length === 1) return { backgroundColor: TEAMS[cellTeams[0]].color };
-    const color1 = TEAMS[cellTeams[0]].color;
-    const color2 = TEAMS[cellTeams[1]].color;
-    return { background: `linear-gradient(45deg, ${color1} 50%, ${color2} 50%)` };
-  };
+            const handleUndo = () => {
+                if (history.length === 0) return;
+                const lastState = history[history.length - 1];
+                setGrid(lastState);
+                setHistory(prev => prev.slice(0, -1));
+            };
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      <div className="max-w-5xl mx-auto">
-        
-        {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
-              <Trophy className="text-yellow-500" /> 出題者視角 v3
-            </h1>
-            <p className="text-slate-500 mt-1">互動教學賓果：點擊下方隊伍後開始標記</p>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={handleUndo}
-              disabled={history.length === 0}
-              className={`flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm transition-all ${
-                history.length === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-50 text-blue-600'
-              }`}
-            >
-              <Undo2 size={18} /> 返回
-            </button>
-            <button 
-              onClick={() => setShowResetModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-red-50 text-red-600 transition-all"
-            >
-              <RotateCcw size={18} /> 重置
-            </button>
-          </div>
-        </header>
+            const getCellStyles = (cellTeams) => {
+                if (cellTeams.length === 0) return { backgroundColor: '#ffffff' };
+                if (cellTeams.length === 1) return { backgroundColor: TEAMS[cellTeams[0]].color };
+                return { background: `linear-gradient(45deg, ${TEAMS[cellTeams[0]].color} 50%, ${TEAMS[cellTeams[1]].color} 50%)` };
+            };
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* 左側：賓果盤 */}
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-5 gap-2 md:gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-slate-100 aspect-square">
-              {grid.map((cellTeams, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleCellClick(idx)}
-                  style={getCellStyles(cellTeams)}
-                  className={`relative flex items-center justify-center rounded-xl text-xl md:text-3xl font-bold transition-all transform hover:scale-[1.02] active:scale-95 shadow-inner border-2 ${
-                    cellTeams.length > 0 ? 'border-white/30 text-white' : 'border-transparent text-slate-300'
-                  }`}
-                >
-                  <span className="drop-shadow-md">{idx + 1}</span>
-                  {cellTeams.includes(activeTeam) && (
-                    <div className="absolute top-1 right-1 w-2 h-2 md:w-3 md:h-3 bg-white rounded-full animate-pulse" />
-                  )}
-                </button>
-              ))}
-            </div>
-            
-            <div className="mt-6 bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start gap-3">
-              <Info className="text-blue-500 shrink-0 mt-1" size={20} />
-              <div className="text-sm text-blue-800">
-                <p className="font-semibold">操作說明：</p>
-                <ul className="list-disc list-inside opacity-90">
-                  <li>先點選右側的<strong>隊伍卡片</strong>，再點擊棋盤格子。</li>
-                  <li>每一格最多可容納<strong>兩個隊伍</strong>。</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-5xl mx-auto">
+                        <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+                                    <Trophy className="text-yellow-500" /> 出題者視角 v3
+                                </h1>
+                                <p className="text-slate-500">互動賓果計分系統</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleUndo} disabled={history.length === 0} className={`flex items-center gap-2 px-4 py-2 bg-white border rounded-lg shadow-sm ${history.length === 0 ? 'opacity-30' : 'hover:bg-blue-50 text-blue-600'}`}>
+                                    <Undo2 size={18} /> 返回上一步
+                                </button>
+                                <button onClick={() => setShowResetModal(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 text-red-600">
+                                    <RotateCcw size={18} /> 重置
+                                </button>
+                            </div>
+                        </header>
 
-          {/* 右側：分數板 */}
-          <div className="flex flex-col gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-700">
-                <Users size={20} /> 隊伍得分
-              </h2>
-              
-              <div className="space-y-4">
-                {Object.values(TEAMS).map((team) => (
-                  <div 
-                    key={team.id}
-                    onClick={() => setActiveTeam(team.id)}
-                    className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center justify-between ${
-                      activeTeam === team.id 
-                        ? `${team.activeClass} scale-[1.02] shadow-md` 
-                        : 'border-transparent bg-slate-50 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg ${team.bgColor} flex items-center justify-center text-white shadow-sm font-bold`}>
-                        {team.name[0]}
-                      </div>
-                      <span className={`font-bold ${activeTeam === team.id ? 'text-slate-800' : 'text-slate-500'}`}>
-                        {team.name}
-                      </span>
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                            <div className="lg:col-span-3">
+                                <div className="grid grid-cols-5 gap-2 md:gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-slate-100 aspect-square">
+                                    {grid.map((cellTeams, idx) => (
+                                        <button key={idx} onClick={() => handleCellClick(idx)} style={getCellStyles(cellTeams)}
+                                            className={`relative flex items-center justify-center rounded-xl text-xl md:text-3xl font-bold transition-all transform active:scale-95 shadow-sm border-2 ${cellTeams.length > 0 ? 'border-white/30 text-white' : 'border-slate-100 text-slate-300'}`}>
+                                            {idx + 1}
+                                            {cellTeams.includes(activeTeam) && <div className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-pulse" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-6">
+                                <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
+                                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-700">
+                                        <Users size={20} /> 隊伍與分數
+                                    </h2>
+                                    <div className="space-y-4">
+                                        {Object.values(TEAMS).map((team) => (
+                                            <div key={team.id} onClick={() => setActiveTeam(team.id)}
+                                                className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center justify-between ${activeTeam === team.id ? team.activeClass + ' scale-[1.02] shadow-md' : 'border-transparent bg-slate-50'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-lg ${team.bgColor} flex items-center justify-center text-white font-bold`}>{team.name[0]}</div>
+                                                    <span className={`font-bold ${activeTeam === team.id ? 'text-slate-800' : 'text-slate-400'}`}>{team.name}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-black text-slate-800">{scores[team.id]}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold">PTS</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-black text-slate-800">{scores[team.id]}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">PTS</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Modal: 重置確認 */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-4 mx-auto">
-              <AlertTriangle className="text-red-600" size={24} />
-            </div>
-            <h3 className="text-xl font-bold text-center text-slate-800 mb-2">確定重置遊戲？</h3>
-            <p className="text-slate-500 text-center text-sm mb-6">這將清空所有進度且無法復原。</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowResetModal(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50">取消</button>
-              <button onClick={confirmReset} className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200">確定重置</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+                    {showResetModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+                                <div className="w-12 h-12 bg-red-100 rounded-full mb-4 mx-auto flex items-center justify-center text-red-600">
+                                    <AlertTriangle size={24} />
+                                </div>
+                                <h3 className="text-xl font-bold text-center mb-6">確定重置遊戲？</h3>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowResetModal(false)} className="flex-1 py-2 border rounded-xl">取消</button>
+                                    <button onClick={() => { setGrid(Array(25).fill([])); setHistory([]); setShowResetModal(false); }} className="flex-1 py-2 bg-red-600 text-white rounded-xl shadow-lg">確定</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
 
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
